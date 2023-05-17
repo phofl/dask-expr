@@ -192,6 +192,7 @@ def timeseries(
         Valid types include {float, int, str, 'category'}
     freq: string
         String like '2s' or '1H' or '12W' for the time series frequency
+
     partition_freq: string
         String like '1M' or '2Y' to divide the dataframe into partitions
     seed: int (optional)
