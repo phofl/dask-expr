@@ -1242,6 +1242,7 @@ class Fused(Blockwise):
     ----------
     exprs : List[Expr]
         Group of original ``Expr`` objects being fused together.
+
     *dependencies:
         List of external ``Expr`` dependencies. External-``Expr``
         dependencies correspond to any ``Expr`` operand that is
