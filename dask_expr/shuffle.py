@@ -4,6 +4,7 @@ import operator
 import uuid
 
 import numpy as np
+import pandas as pd
 import tlz as toolz
 from dask.dataframe.core import _concat, make_meta
 from dask.dataframe.shuffle import (
@@ -17,6 +18,7 @@ from dask.dataframe.shuffle import (
     shuffle_group_2,
     shuffle_group_get,
 )
+from dask.dataframe.utils import UNKNOWN_CATEGORIES
 from dask.utils import M, digit, get_default_shuffle_method, insert
 
 from dask_expr.expr import Assign, Blockwise, Expr, PartitionsFiltered, Projection
@@ -623,7 +625,7 @@ class SetIndex(Expr):
     def _divisions(self):
         if self.user_divisions is not None:
             return self.user_divisions
-        return self._calculate_divisions()
+        return tuple(self._calculate_divisions().tolist())
 
     @property
     def _meta(self):
@@ -643,12 +645,28 @@ class SetIndex(Expr):
     def _calculate_divisions(self):
         from dask_expr import RepartitionQuantiles, new_collection
 
-        return new_collection(
+        divisions = new_collection(
             RepartitionQuantiles(self.other, self.frame.npartitions)
         ).compute()
 
+        nas = divisions.isna()
+        dtype = self.other._meta.dtype
+        if (
+            nas.any()
+            and pd.api.types.is_integer_dtype(dtype)
+            or isinstance(dtype, pd.CategoricalDtype)
+            and UNKNOWN_CATEGORIES in dtype.categories
+        ):
+            # int64 with NA or categorical with unknown categories shouldn't keep the dtype
+            dtype = None
+
+        if nas.any():
+            divisions[nas] = None
+
+        return self.frame._meta._constructor_sliced(divisions, dtype=dtype)
+
     def _simplify_down(self):
-        divisions = self._divisions()
+        divisions = self._calculate_divisions()
         return SetPartition(self.frame, self._other, self.drop, divisions)
 
 
