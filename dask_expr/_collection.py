@@ -47,6 +47,7 @@ from dask_expr._reductions import (
 from dask_expr._repartition import Repartition
 from dask_expr._shuffle import SetIndex, SetIndexBlockwise, SortValues
 from dask_expr._util import _convert_to_list, is_scalar
+from dask_expr.io.iceberg import FromIceberg
 
 #
 # Utilities to wrap Expr API
@@ -1145,6 +1146,10 @@ def read_parquet(
             kwargs=kwargs,
         )
     )
+
+
+def from_iceberg(table_scan):
+    return new_collection(FromIceberg(table_scan))
 
 
 def concat(
