@@ -7,7 +7,7 @@ from pyiceberg.expressions.visitors import bind, extract_field_ids
 from pyiceberg.io.pyarrow import PyArrowFileIO, _task_to_table, schema_to_pyarrow
 from pyiceberg.types import ListType, MapType
 
-from dask_expr._expr import PartitionsFiltered
+from dask_expr._expr import PartitionsFiltered, Projection
 from dask_expr.io import BlockwiseIO
 
 
@@ -94,4 +94,6 @@ class FromIceberg(PartitionsFiltered, BlockwiseIO):
         return self.tasks_to_dataframe, self.iceberg_tasks[index]
 
     def _simplify_up(self, parent):
-        return
+        if isinstance(parent, Projection):
+            columns = parent.columns
+            return type(self)(self.table_scan.select(*columns), *self.operands[1:])
