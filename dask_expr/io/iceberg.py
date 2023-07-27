@@ -1,7 +1,6 @@
 import functools
 from typing import Callable
 
-from dask.utils import apply
 from pyarrow._fs import PyFileSystem
 from pyarrow.fs import FSSpecHandler
 from pyiceberg.expressions.visitors import bind, extract_field_ids
@@ -63,6 +62,9 @@ class FromIceberg(PartitionsFiltered, BlockwiseIO):
     def npartitions(self):
         return len(self.iceberg_tasks)
 
+    def tasks_to_dataframe(self, task):
+        return self._scan_method(task=task).to_pandas()
+
     @functools.cached_property
     def _scan_method(self) -> Callable:
         bound_row_filter = bind(
@@ -89,12 +91,7 @@ class FromIceberg(PartitionsFiltered, BlockwiseIO):
         )
 
     def _filtered_task(self, index: int):
-        return (
-            apply,
-            lambda task: self._scan_method(task=task).to_pandas(),
-            (),
-            {"task": self.iceberg_tasks[index]},
-        )
+        return self.tasks_to_dataframe, self.iceberg_tasks[index]
 
     def _simplify_up(self, parent):
         return
