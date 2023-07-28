@@ -25,7 +25,7 @@ class FromIceberg(PartitionsFiltered, BlockwiseIO):
 
     @property
     def _name(self):
-        return id(self)
+        return "42"
 
     @functools.cached_property
     def _meta(self):
