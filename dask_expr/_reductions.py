@@ -21,6 +21,48 @@ from dask_expr._expr import Blockwise, Expr, Index, Projection
 from dask_expr._util import is_scalar
 
 
+class Chunk(Blockwise):
+    """Partition-wise component of `ApplyConcatApply`
+
+    This class is used within `ApplyConcatApply._lower`.
+
+    See Also
+    --------
+    ApplyConcatApply
+    """
+
+    _parameters = ["frame", "kind", "chunk", "chunk_kwargs"]
+
+    def operation(self, *args, **kwargs):
+        return self.chunk(*args, **kwargs)
+
+    @functools.cached_property
+    def _args(self) -> list:
+        return [self.frame]
+
+    @functools.cached_property
+    def _kwargs(self) -> dict:
+        return self.chunk_kwargs or {}
+
+    def _tree_repr_lines(self, indent=0, recursive=True):
+        header = f"{funcname(self.kind)}({funcname(type(self))}):"
+        lines = []
+        if recursive:
+            for dep in self.dependencies():
+                lines.extend(dep._tree_repr_lines(2))
+
+        for k, v in self.chunk_kwargs.items():
+            try:
+                if v != self.kind._defaults[k]:
+                    header += f" {k}={v}"
+            except KeyError:
+                header += f" {k}={v}"
+
+        lines = [header] + lines
+        lines = [" " * indent + line for line in lines]
+        return lines
+
+
 class ApplyConcatApply(Expr):
     """Perform reduction-like operation on dataframes
 
@@ -46,6 +88,7 @@ class ApplyConcatApply(Expr):
     chunk_kwargs = {}
     combine_kwargs = {}
     aggregate_kwargs = {}
+    _chunk_cls = Chunk
 
     def _layer(self):
         # This is an abstract expression
@@ -91,7 +134,7 @@ class ApplyConcatApply(Expr):
         # Decompose ApplyConcatApply into Chunk and TreeReduce
         aca_type = type(self)
         return TreeReduce(
-            Chunk(self.frame, aca_type, chunk, chunk_kwargs),
+            self._chunk_cls(self.frame, aca_type, chunk, chunk_kwargs),
             aca_type,
             self._meta,
             combine,
@@ -99,49 +142,8 @@ class ApplyConcatApply(Expr):
             combine_kwargs,
             aggregate_kwargs,
             split_every=getattr(self, "split_every", 0),
+            by=getattr(self, "by", None),
         )
-
-
-class Chunk(Blockwise):
-    """Partition-wise component of `ApplyConcatApply`
-
-    This class is used within `ApplyConcatApply._lower`.
-
-    See Also
-    --------
-    ApplyConcatApply
-    """
-
-    _parameters = ["frame", "kind", "chunk", "chunk_kwargs"]
-
-    def operation(self, *args, **kwargs):
-        return self.chunk(*args, **kwargs)
-
-    @functools.cached_property
-    def _args(self) -> list:
-        return [self.frame]
-
-    @functools.cached_property
-    def _kwargs(self) -> dict:
-        return self.chunk_kwargs or {}
-
-    def _tree_repr_lines(self, indent=0, recursive=True):
-        header = f"{funcname(self.kind)}({funcname(type(self))}):"
-        lines = []
-        if recursive:
-            for dep in self.dependencies():
-                lines.extend(dep._tree_repr_lines(2))
-
-        for k, v in self.chunk_kwargs.items():
-            try:
-                if v != self.kind._defaults[k]:
-                    header += f" {k}={v}"
-            except KeyError:
-                header += f" {k}={v}"
-
-        lines = [header] + lines
-        lines = [" " * indent + line for line in lines]
-        return lines
 
 
 class TreeReduce(Expr):
