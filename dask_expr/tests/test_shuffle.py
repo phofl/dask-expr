@@ -278,3 +278,27 @@ def test_sort_head_nlargest(df):
     a = df.sort_values("x", ascending=True).tail(10, compute=False).expr
     b = df.nlargest(10, columns=["x"]).expr
     assert a.optimize()._name == b.optimize()._name
+
+
+def test_set_index_head_nlargest(df, pdf):
+    a = df.set_index("x").head(10, compute=False).expr
+    b = df.nsmallest(10, columns="x").set_index("x").expr
+    assert a.optimize()._name == b.optimize()._name
+
+    a = df.set_index("x").tail(10, compute=False).expr
+    b = df.nlargest(10, columns="x").set_index("x").expr
+    assert a.optimize()._name == b.optimize()._name
+
+    # These still work, even if we haven't optimized them yet
+    df.set_index(df.x).head(3)
+    # df.set_index([df.x, df.y]).head(3)
+
+
+def test_filter_sort(df):
+    a = df.sort_values("x")
+    a = a[a.y > 40]
+
+    b = df[df.y > 40]
+    b = b.sort_values("x")
+
+    assert a.optimize()._name == b.optimize()._name
