@@ -33,7 +33,7 @@ def _partition_reducer(x):
 class Merge(Expr):
     """Merge / join two dataframes
 
-    This is an abstract class.  It will be transformed into a concrete
+    This is an abstract class. It will be transformed into a concrete
     implementation before graph construction.
 
     See Also
