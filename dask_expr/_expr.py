@@ -508,9 +508,11 @@ class Expr:
             # Have to respect ops that were injected while lowering or filters
             if isinstance(frame, remove_ops):
                 ops_to_push_up.append(frame.operands[1])
+                frame = frame.frame
+                break
             else:
                 operations.append((type(frame), frame.operands[1:]))
-            frame = frame.frame
+                frame = frame.frame
 
         if len(ops_to_push_up) > 0:
             # Remove the projections but build the remaining things back up
@@ -1662,6 +1664,7 @@ class Eval(Elemwise):
 
 
 class Filter(Blockwise):
+    _projection_passthrough = True
     _parameters = ["frame", "predicate"]
     operation = operator.getitem
 
