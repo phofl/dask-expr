@@ -5,9 +5,9 @@ import pytest
 from dask.dataframe.utils import assert_eq
 
 from dask_expr import from_dask_dataframe, from_pandas, optimize, read_csv, read_parquet
-from dask_expr._expr import Expr, Lengths, Literal, Replace
+from dask_expr._expr import Expr, Fillna, Lengths, Literal, Replace
 from dask_expr._reductions import Len
-from dask_expr.io import ReadCSV, ReadParquet
+from dask_expr.io import FusedIO, ReadCSV, ReadParquet
 from dask_expr.tests._util import _backend_library
 
 # Set DataFrame backend for this module
@@ -169,6 +169,15 @@ def test_io_fusion_blockwise(tmpdir):
     dd.from_pandas(pdf, 2).to_parquet(tmpdir)
     df = read_parquet(tmpdir)["a"].fillna(10).optimize()
     assert df.npartitions == 1
+
+
+def test_io_fusion_with_next_layer(tmpdir):
+    pdf = lib.DataFrame({c: range(10) for c in "abcdefghijk"})
+    dd.from_pandas(pdf, 2).to_parquet(tmpdir)
+    df = read_parquet(tmpdir)["a"].fillna(10).optimize()
+    assert any(isinstance(x, FusedIO) for x in df.expr.operands[0])
+    assert any(isinstance(x, Fillna) for x in df.expr.operands[0])
+    assert len(df.expr.operands) == 1
 
 
 def test_repartition_io_fusion_blockwise(tmpdir):
