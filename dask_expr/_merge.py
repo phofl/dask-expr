@@ -26,6 +26,10 @@ _HASH_COLUMN_NAME = "__hash_partition"
 _PARTITION_COLUMN = "_partitions"
 
 
+def _partition_reducer(x):
+    return max(x // 2, 1)
+
+
 class Merge(Expr):
     """Merge / join two dataframes
 
@@ -167,6 +171,10 @@ class Merge(Expr):
             or shuffle_backend is None
             and get_default_shuffle_method() == "p2p"
         ):
+            if self.how == "inner":
+                left = Repartition(left, _partition_reducer)
+                right = Repartition(right, _partition_reducer)
+
             return HashJoinP2P(
                 left,
                 right,
