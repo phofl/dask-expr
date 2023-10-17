@@ -270,11 +270,17 @@ class Merge(Expr):
         op_left, op_right = op.left, op.right
         if remove in ("both", "left"):
             op_left, columns_left = self._remove_operations(
-                op.left, self._remove_ops, self._skip_ops
+                op.left,
+                self._remove_ops,
+                self._skip_ops,
+                False,
             )
         if remove in ("both", "right"):
             op_right, columns_right = self._remove_operations(
-                op.right, self._remove_ops, self._skip_ops
+                op.right,
+                self._remove_ops,
+                self._skip_ops,
+                False,
             )
 
         return (

@@ -200,6 +200,7 @@ def test_merge_combine_similar(npartitions_left, npartitions_right):
     query = df.merge(df2)
     query["new"] = query.b + query.c
     query = query.groupby(["a", "e", "x"]).new.sum()
+    query.optimize().expr.pprint()
     assert (
         len(query.optimize().__dask_graph__()) <= 25
     )  # 45 is the non-combined version
