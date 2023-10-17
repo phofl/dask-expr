@@ -196,7 +196,7 @@ class GroupbyAggregation(GroupByApplyConcatApply):
 
     @functools.cached_property
     def spec(self):
-        # Converts the `arg` operand into specific
+        # Converts the `arg`  operand into specific
         # chunk, aggregate, and finalizer functions
         if isinstance(self.by, Expr):
             group_columns = []
