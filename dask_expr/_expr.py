@@ -488,7 +488,9 @@ class Expr:
                     common = common._simplify_down() or common
             return common
 
-    def _remove_operations(self, frame, remove_ops, skip_ops=None):
+    def _remove_operations(
+        self, frame, remove_ops, skip_ops=None, stop_after_first=True
+    ):
         """Searches for operations that we have to push up again to avoid
         the duplication of branches that are doing the same.
 
@@ -497,6 +499,7 @@ class Expr:
         frame: Expression that we will search.
         remove_ops: Ops that we will remove to push up again.
         skip_ops: Ops that were introduced and that we want to ignore.
+        stop_after_first: Sometimes we want to look back more than one operation.
 
         Returns
         -------
@@ -511,7 +514,8 @@ class Expr:
             if isinstance(frame, remove_ops):
                 ops_to_push_up.append(frame.operands[1])
                 frame = frame.frame
-                break
+                if stop_after_first:
+                    break
             else:
                 operations.append((type(frame), frame.operands[1:]))
                 frame = frame.frame

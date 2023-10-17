@@ -300,11 +300,11 @@ class Merge(Expr):
         # Push projections back up to avoid performing the same merge multiple times
 
         left, columns_left = self._remove_operations(
-            self.left, self._remove_ops, self._skip_ops
+            self.left, self._remove_ops, self._skip_ops, False
         )
         columns_left = self._flatten_columns(self, columns_left, "left")
         right, columns_right = self._remove_operations(
-            self.right, self._remove_ops, self._skip_ops
+            self.right, self._remove_ops, self._skip_ops, False
         )
         columns_right = self._flatten_columns(self, columns_right, "right")
 
