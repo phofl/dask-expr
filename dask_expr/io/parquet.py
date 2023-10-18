@@ -616,6 +616,12 @@ class ReadParquet(PartitionsFiltered, BlockwiseIO):
             return (operator.getitem, tsk, self.columns[0])
         return tsk
 
+    def _filtered_tasks(self, index: list[int]):
+        tsk = (self._plan["func"], [self._plan["parts"][i] for i in index])
+        if self._series:
+            return (operator.getitem, tsk, self.columns[0])
+        return tsk
+
     def _get_lengths(self) -> tuple | None:
         """Return known partition lengths using parquet statistics"""
         if not self.filters:

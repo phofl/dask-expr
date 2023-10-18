@@ -800,9 +800,8 @@ class Expr:
             seen.add(expr._name)
 
             layers.append(expr._layer())
-            for operand in expr.operands:
-                if isinstance(operand, Expr):
-                    stack.append(operand)
+            for operand in expr.dependencies():
+                stack.append(operand)
 
         return toolz.merge(layers)
 
@@ -2255,6 +2254,12 @@ def optimize_io_fusion(expr):
     partitions together if possible."""
 
     def _fusion_pass(expr):
+        if isinstance(expr, BlockwiseIO):
+            if expr._fusion_compression_factor < 1:
+                return FusedIO(expr)
+            else:
+                return expr
+
         new_operands = []
         changed = False
         for operand in expr.operands:
