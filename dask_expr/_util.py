@@ -57,6 +57,8 @@ def _tokenize_partial(expr, ignore: list | None = None) -> str:
     # Helper function to "tokenize" the operands
     # that are not in the `ignore` list
     ignore = ignore or []
+    ignore = ignore.copy()
+    ignore.append("filesystem")
     return _tokenize_deterministic(
         *[
             op

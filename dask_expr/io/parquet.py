@@ -25,7 +25,7 @@ from dask.dataframe.io.parquet.core import (
 from dask.dataframe.io.parquet.utils import _split_user_options
 from dask.dataframe.io.utils import _is_local_fs
 from dask.delayed import delayed
-from dask.utils import apply, natural_sort_key, typename
+from dask.utils import apply, funcname, natural_sort_key, typename
 from fsspec.utils import stringify_path
 
 from dask_expr._expr import (
@@ -45,7 +45,7 @@ from dask_expr._expr import (
     Projection,
 )
 from dask_expr._reductions import Len
-from dask_expr._util import _convert_to_list
+from dask_expr._util import _convert_to_list, _tokenize_deterministic
 from dask_expr.io import BlockwiseIO, PartitionsFiltered
 
 NONE_LABEL = "__null_dask_index__"
@@ -433,6 +433,12 @@ class ReadParquet(PartitionsFiltered, BlockwiseIO):
     }
     _pq_length_stats = None
     _absorb_projections = True
+
+    @functools.cached_property
+    def _name(self):
+        ops = self.operands.copy()
+        ops.pop(self._parameters.index("filesystem"))
+        return funcname(type(self)).lower() + "-" + _tokenize_deterministic(*ops)
 
     @property
     def engine(self):
