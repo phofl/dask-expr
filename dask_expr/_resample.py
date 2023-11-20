@@ -87,7 +87,7 @@ class ResampleAggregation(Blockwise):
         return super()._blockwise_arg(arg, i)
 
 
-class Count(ResampleReduction):
+class ResampleCount(ResampleReduction):
     how = "count"
 
 
@@ -123,4 +123,4 @@ class Resampler:
         )
 
     def count(self):
-        return self._single_agg(Count)
+        return self._single_agg(ResampleCount)
