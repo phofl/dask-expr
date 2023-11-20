@@ -1,13 +1,14 @@
 import functools
 from collections import namedtuple
 
+import pandas as pd
 import numpy as np
 from dask.dataframe.tseries.resample import _resample_bin_and_out_divs, _resample_series
-
+from dask.utils import M
+from dask_expr._collection import new_collection
 from dask_expr._expr import Blockwise, Expr
 
 BlockwiseDep = namedtuple(typename="BlockwiseDep", field_names=["iterable"])
-
 
 class ResampleReduction(Expr):
     _parameters = [
@@ -76,3 +77,43 @@ class ResampleAggregation(Blockwise):
         if isinstance(arg, BlockwiseDep):
             return arg.iterable[i]
         return super()._blockwise_arg(arg, i)
+
+
+class Count(ResampleAggregation):
+    resample_chunk = M.count
+    resample_aggregate = M.sum
+
+
+class Resampler:
+    """Aggregate using one or more operations
+
+    The purpose of this class is to expose an API similar
+    to Pandas' `Resampler` for dask-expr
+    """
+
+    def __init__(self, obj, rule, **kwargs):
+        if not obj.known_divisions:
+            msg = (
+                "Can only resample dataframes with known divisions\n"
+                "See https://docs.dask.org/en/latest/dataframe-design.html#partitions\n"
+                "for more information."
+            )
+            raise ValueError(msg)
+        self.obj = obj
+        self.rule = pd.tseries.frequencies.to_offset(rule)
+        self.kwargs = kwargs
+
+    def _single_agg(
+        self,
+        expr_cls,
+    ):
+        return new_collection(
+            expr_cls(
+                self.obj.expr,
+                self.rule,
+                self.kwargs,
+            )
+        )
+
+    def count(self, **kwargs):
+        return self._single_agg(Count, **kwargs)
