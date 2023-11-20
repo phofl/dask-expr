@@ -1,15 +1,15 @@
 import functools
 from collections import namedtuple
 
-import pandas as pd
 import numpy as np
 from dask.dataframe.tseries.resample import _resample_bin_and_out_divs, _resample_series
-from dask.utils import M
+
 from dask_expr._collection import new_collection
-from dask_expr._repartition import Repartition
 from dask_expr._expr import Blockwise, Expr
+from dask_expr._repartition import Repartition
 
 BlockwiseDep = namedtuple(typename="BlockwiseDep", field_names=["iterable"])
+
 
 class ResampleReduction(Expr):
     _parameters = [
@@ -35,7 +35,7 @@ class ResampleReduction(Expr):
 
     @functools.cached_property
     def _meta(self):
-        return self.frame._meta.resample(self.rule, **self.kwargs)
+        return getattr(self.frame._meta.resample(self.rule, **self.kwargs), self.how)()
 
     @functools.cached_property
     def kwargs(self):
@@ -43,10 +43,14 @@ class ResampleReduction(Expr):
 
     @functools.cached_property
     def _resample_divisions(self):
-        return _resample_bin_and_out_divs(self.frame.divisions, self.rule, **self.kwargs)
+        return _resample_bin_and_out_divs(
+            self.frame.divisions, self.rule, **self.kwargs
+        )
 
     def _lower(self):
-        partitioned = Repartition(self.frame, new_divisions=self._resample_divisions[0], force=True)
+        partitioned = Repartition(
+            self.frame, new_divisions=self._resample_divisions[0], force=True
+        )
         output_divisions = self._resample_divisions[1]
         return ResampleAggregation(
             partitioned,
@@ -79,7 +83,7 @@ class ResampleAggregation(Blockwise):
 
     @functools.cached_property
     def _meta(self):
-        return self.frame._meta.resample(self.rule, **self.kwargs)
+        return getattr(self.frame._meta.resample(self.rule, **self.kwargs), self.how)()
 
     def _blockwise_arg(self, arg, i):
         if isinstance(arg, BlockwiseDep):
