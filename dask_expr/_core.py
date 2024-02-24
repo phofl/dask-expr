@@ -47,8 +47,11 @@ class Expr:
     _parameters = []
     _defaults = {}
     _instances = weakref.WeakValueDictionary()
+    _branch_id_required = False
+    _reuse_consumer = False
 
     def __new__(cls, *args, _branch_id=None, **kwargs):
+        cls._check_branch_id_given(args, _branch_id)
         operands = list(args)
         if _branch_id is None and len(operands) and isinstance(operands[-1], BranchId):
             _branch_id = operands.pop(-1)
@@ -70,6 +73,15 @@ class Expr:
 
         Expr._instances[_name] = inst
         return inst
+
+    @classmethod
+    def _check_branch_id_given(cls, args, _branch_id):
+        if not cls._branch_id_required:
+            return
+        operands = list(args)
+        if _branch_id is None and len(operands) and isinstance(operands[-1], BranchId):
+            _branch_id = operands.pop(-1)
+        assert _branch_id is not None, "BranchId not found"
 
     def _tune_down(self):
         return None
@@ -473,6 +485,21 @@ class Expr:
             + _tokenize_deterministic(*self.operands, self._branch_id)
         )
 
+    @functools.cached_property
+    def _dep_name(self):
+        # The name identifies every expression uniquely. The dependents name
+        # is used during optimization to capture the dependents of any given
+        # expression. A reuse consumer will have the same dependents independently
+        # of the branch_id parameter, since we want to reuse everything that comes
+        # before us and split branches up everything that is processed after
+        # us. So we have to ignore the branch_id from tokenization for those
+        # nodes.
+        if not self._reuse_consumer:
+            return self._name
+        return (
+            funcname(type(self)).lower() + "-" + _tokenize_deterministic(*self.operands)
+        )
+
     @property
     def _meta(self):
         raise NotImplementedError()
@@ -597,7 +624,7 @@ class Expr:
                 new_exprs.append(operand)
 
         if update:  # Only recreate if something changed
-            return type(self)(*new_exprs)
+            return type(self)(*new_exprs, _branch_id=self._branch_id)
         else:
             _seen.add(self._name)
         return self
@@ -784,5 +811,5 @@ def collect_dependents(expr) -> defaultdict:
 
         for dep in node.dependencies():
             stack.append(dep)
-            dependents[dep._name].append(weakref.ref(node))
+            dependents[dep._dep_name].append(weakref.ref(node))
     return dependents
