@@ -220,7 +220,8 @@ class GroupByApplyConcatApply(ApplyConcatApply, GroupByBase):
                 {
                     "split_out": functools.partial(
                         _adjust_split_out_for_group_keys, by=self.by
-                    )
+                    ),
+                    "split_every": 20,  # Set so that we don't do a tree reduce
                 }
             )
 
