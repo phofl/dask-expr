@@ -1873,7 +1873,7 @@ class GroupBy:
 
     @_aggregate_docstring(based_on="pd.core.groupby.DataFrameGroupBy.agg")
     def aggregate(
-        self, arg=None, split_every=8, split_out=None, shuffle_method=None, **kwargs
+        self, arg=None, split_every=8, split_out=1, shuffle_method=None, **kwargs
     ):
         if arg is None:
             raise NotImplementedError("arg=None not supported")
