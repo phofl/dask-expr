@@ -31,9 +31,12 @@ from dask_expr._expr import (  # noqa: F401
     determine_column_projection,
     is_filter_pushdown_available,
 )
+from dask_expr._reductions import ApplyConcatApply, ShuffleReduce
 from dask_expr._repartition import Repartition
 from dask_expr._shuffle import (
     RearrangeByColumn,
+    ShuffleBase,
+    SimpleShuffle,
     _contains_index_name,
     _select_columns_or_index,
 )
@@ -41,6 +44,83 @@ from dask_expr._util import _convert_to_list, _tokenize_deterministic, is_scalar
 
 _HASH_COLUMN_NAME = "__hash_partition"
 _PARTITION_COLUMN = "_partitions"
+
+
+def previously_shuffled_on_same_column(expr, shuffle_column):
+    seen = set()
+    stack = [expr]
+
+    partition_change_ops = []
+
+    while stack:
+        node = stack.pop()
+        if node._name in seen:
+            continue
+        seen.add(node._name)
+
+        if isinstance(node, Blockwise):
+            # need to be more precise, have to exclude things like fillna/replace
+            stack.extend(node.dependencies())
+            continue
+
+        if isinstance(node, (ShuffleBase, ShuffleReduce)):
+            # we shuffle, so stop recursing here for this branch
+            partition_change_ops.append(node)
+            continue
+
+        elif isinstance(node, ApplyConcatApply):
+            if node.split_out > 1 or node.split_out is True:
+                partition_change_ops.append(node)
+                continue
+        elif isinstance(node, Merge):
+            partition_change_ops.append(node)
+            continue
+
+        # We found a node that doesn't tell us anything about the partitioning layout
+        return False
+    if len(partition_change_ops) == 0:
+        return False
+
+    for op in partition_change_ops:
+        if isinstance(op, (ApplyConcatApply, ShuffleReduce)):
+            if getattr(op, "shuffle_by_index", None):
+                shuffle_col = op._meta.index.name
+            elif isinstance(op.split_by, list):
+                shuffle_col = op.split_by[0]
+            else:
+                shuffle_col = op.split_by
+        elif isinstance(op, SimpleShuffle):
+            shuffle_col = op.partitioning_index[0]
+        elif isinstance(op, Merge):
+            shuffle_col = []
+            if op.left_index:
+                shuffle_col.append(op.left.index._meta.name)
+            else:
+                shuffle_col.append(
+                    op.left_on[0] if isinstance(op.left_on, list) else op.left_on
+                )
+            if op.right_index:
+                shuffle_col.append(op.right.index._meta.name)
+            else:
+                shuffle_col.append(
+                    op.right_on[0] if isinstance(op.right_on, list) else op.right_on
+                )
+
+            if shuffle_column in shuffle_col:
+                continue
+            return False
+
+        else:
+            if op.index_shuffle:
+                shuffle_col = op._meta.index.name
+            else:
+                shuffle_col = op.shuffle_on[0]
+
+        if isinstance(shuffle_col, Expr):
+            shuffle_col = shuffle_col._meta._name
+        if shuffle_col != shuffle_column:
+            return False
+    return True
 
 
 class Merge(Expr):
@@ -319,6 +399,13 @@ class Merge(Expr):
         right_index = self.right_index
         shuffle_method = self.shuffle_method
 
+        left_already_shuffled = previously_shuffled_on_same_column(
+            left, left_on if not left_index else left.index._meta.name
+        )
+        right_already_shuffled = previously_shuffled_on_same_column(
+            right, right_on if not right_index else right.index._meta.name
+        )
+
         # TODO:
         #  1. Add/leverage partition statistics
 
@@ -386,10 +473,15 @@ class Merge(Expr):
                     self.indicator,
                 )
 
-        if (shuffle_left_on or shuffle_right_on) and (
-            shuffle_method == "p2p"
-            or shuffle_method is None
-            and get_default_shuffle_method() == "p2p"
+        if (
+            (shuffle_left_on or shuffle_right_on)
+            and (
+                shuffle_method == "p2p"
+                or shuffle_method is None
+                and get_default_shuffle_method() == "p2p"
+            )
+            and not left_already_shuffled
+            and not right_already_shuffled
         ):
             return HashJoinP2P(
                 left,
@@ -406,7 +498,7 @@ class Merge(Expr):
                 _npartitions=self.operand("_npartitions"),
             )
 
-        if shuffle_left_on:
+        if shuffle_left_on and not left_already_shuffled:
             # Shuffle left
             left = RearrangeByColumn(
                 left,
@@ -416,7 +508,7 @@ class Merge(Expr):
                 index_shuffle=left_index,
             )
 
-        if shuffle_right_on:
+        if shuffle_right_on and not right_already_shuffled:
             # Shuffle right
             right = RearrangeByColumn(
                 right,
