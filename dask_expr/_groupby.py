@@ -80,7 +80,7 @@ def _as_dict(key, value):
 
 
 def _adjust_split_out_for_group_keys(npartitions, by):
-    return math.ceil(npartitions / (20 / max(len(by) - 1, 1)))
+    return math.ceil(npartitions / (10 / max(len(by) - 1, 1)))
 
 
 class Aggregation:
