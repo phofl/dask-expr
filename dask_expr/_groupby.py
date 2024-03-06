@@ -80,7 +80,7 @@ def _as_dict(key, value):
 
 
 def _adjust_split_out_for_group_keys(npartitions, by):
-    return math.ceil(npartitions / (20 / (len(by) - 1)))
+    return math.ceil(npartitions / (20 / max(len(by) - 1, 0.5)))
 
 
 class Aggregation:
@@ -215,7 +215,7 @@ class GroupByApplyConcatApply(ApplyConcatApply, GroupByBase):
         return self.frame.columns
 
     def _tune_down(self):
-        if len(self.by) > 1 and self.operand("split_out") is None:
+        if self.operand("split_out") is None:
             return self.substitute_parameters(
                 {
                     "split_out": functools.partial(

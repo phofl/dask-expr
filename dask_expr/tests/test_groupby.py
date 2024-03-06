@@ -351,7 +351,7 @@ def test_split_out_automatically():
     pdf = pd.DataFrame({"a": [1, 2, 3] * 1_000, "b": 1, "c": 1, "d": 1})
     df = from_pandas(pdf, npartitions=500)
     q = df.groupby("a").sum()
-    assert q.optimize().npartitions == 1
+    assert q.optimize().npartitions == 13
     expected = pdf.groupby("a").sum()
     assert_eq(q, expected)
 
