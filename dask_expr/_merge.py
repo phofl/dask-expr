@@ -25,6 +25,7 @@ from dask_expr._expr import (  # noqa: F401
     Isin,
     PartitionsFiltered,
     Projection,
+    RenameFrame,
     Unaryop,
     _DelayedExpr,
     are_co_aligned,
@@ -57,6 +58,13 @@ def previously_shuffled_on_same_column(expr, shuffle_column):
         if node._name in seen:
             continue
         seen.add(node._name)
+
+        if (
+            isinstance(node, RenameFrame)
+            and shuffle_column in node.operand("columns").values()
+        ):
+            map = {v: k for k, v in node.operand("columns").items()}
+            shuffle_column = map[shuffle_column]
 
         if isinstance(node, Blockwise):
             # need to be more precise, have to exclude things like fillna/replace
