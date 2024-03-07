@@ -400,6 +400,28 @@ class FrameBase(DaskMethodsMixin):
             other = other.copy()
         return new_collection(self.expr.__getitem__(other))
 
+    def __dask_tokenize__(self):
+        return type(self).__name__, self._expr._name
+
+    def __repr__(self):
+        data = self._repr_data().to_string(max_rows=5)
+        _str_fmt = """Dask {klass} Structure:
+{data}
+Dask Name: {name}, {n_expr}
+Expr={expr}"""
+        if len(self.columns) == 0:
+            data = data.partition("\n")[-1].replace("Index", "Divisions")
+            _str_fmt = f"Empty {_str_fmt}"
+        n_expr = len({e._name for e in self.expr.walk()})
+
+        return _str_fmt.format(
+            klass=self.__class__.__name__,
+            data=data,
+            name=key_split(self._name),
+            n_expr=maybe_pluralize(n_expr, "expression"),
+            expr=self.expr,
+        )
+
     def __bool__(self):
         raise ValueError(
             f"The truth value of a {self.__class__.__name__} is ambiguous. "
@@ -2414,6 +2436,9 @@ class DataFrame(FrameBase):
     def _ipython_key_completions_(self):
         return methods.tolist(self.columns)
 
+    def _repr_html_(self):
+        return self.to_html()
+
     @derived_from(pd.DataFrame)
     def assign(self, **pairs):
         result = self
@@ -2714,9 +2739,6 @@ class DataFrame(FrameBase):
             meta = expr._emulate(M.map, self, func, na_action=na_action, udf=True)
             warnings.warn(meta_warning(meta))
         return new_collection(expr.Map(self, arg=func, na_action=na_action, meta=meta))
-
-    def __repr__(self):
-        return f"<dask_expr.expr.DataFrame: expr={self.expr}>"
 
     @derived_from(pd.DataFrame)
     def nlargest(self, n=5, columns=None, split_every=None):
@@ -3644,11 +3666,11 @@ class DataFrame(FrameBase):
     def to_html(self, max_rows=5):
         # pd.Series doesn't have html repr
         data = self._repr_data().to_html(max_rows=max_rows, show_dimensions=False)
-        layers = len({k for (k, _) in self.dask.keys()})
+        n_expr = len({e._name for e in self.walk()})
         return get_template("dataframe.html.j2").render(
             data=data,
             name=self._name,
-            layers=maybe_pluralize(layers, "graph layer"),
+            layers=maybe_pluralize(n_expr, "expression"),
         )
 
     def _repr_data(self):
@@ -3801,9 +3823,6 @@ class Series(FrameBase):
     def clip(self, lower=None, upper=None, axis=None, **kwargs):
         axis = self._validate_axis(axis)
         return new_collection(self.expr.clip(lower, upper, axis))
-
-    def __repr__(self):
-        return f"<dask_expr.expr.Series: expr={self.expr}>"
 
     @derived_from(pd.Series)
     def to_frame(self, name=no_default):
@@ -4637,6 +4656,7 @@ def read_parquet(
     parquet_file_extension=(".parq", ".parquet", ".pq"),
     filesystem="fsspec",
     engine=None,
+    arrow_to_pandas=None,
     **kwargs,
 ):
     from dask_expr.io.parquet import (
@@ -4649,6 +4669,8 @@ def read_parquet(
         path = stringify_path(path)
 
     kwargs["dtype_backend"] = dtype_backend
+    if arrow_to_pandas:
+        kwargs["arrow_to_pandas"] = arrow_to_pandas
 
     if filters is not None:
         for filter in flatten(filters, container=list):
@@ -4664,10 +4686,6 @@ def read_parquet(
         if parse_version(pa.__version__) < parse_version("15.0.0"):
             raise ValueError(
                 "pyarrow>=15.0.0 is required to use the pyarrow filesystem."
-            )
-        if calculate_divisions:
-            raise NotImplementedError(
-                "calculate_divisions is not supported when using the pyarrow filesystem."
             )
         if metadata_task_size is not None:
             raise NotImplementedError(
@@ -4701,9 +4719,12 @@ def read_parquet(
                 filters=filters,
                 categories=categories,
                 index=index,
+                calculate_divisions=calculate_divisions,
                 storage_options=storage_options,
                 filesystem=filesystem,
                 ignore_metadata_file=ignore_metadata_file,
+                arrow_to_pandas=arrow_to_pandas,
+                pyarrow_strings_enabled=pyarrow_strings_enabled(),
                 kwargs=kwargs,
                 _series=isinstance(columns, str),
             )
