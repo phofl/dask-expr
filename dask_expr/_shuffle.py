@@ -75,12 +75,14 @@ class ShuffleBase(Expr):
         "method",
         "options",
         "index_shuffle",
+        "on",
     ]
     _defaults = {
         "ignore_index": False,
         "method": None,
         "options": None,
         "index_shuffle": None,
+        "on": None,
     }
     _is_length_preserving = True
     _filter_passthrough = True
@@ -196,6 +198,7 @@ class Shuffle(ShuffleBase):
             self.npartitions_out,
             self.ignore_index,
             self.options,
+            self.on,
         ]
         if method == "p2p":
             return P2PShuffle(frame, *ops)
@@ -293,6 +296,8 @@ class RearrangeByColumn(ShuffleBase):
             ignore_index,
             self.method,
             options,
+            None,
+            partitioning_index,
         )
         if frame.ndim == 1:
             # Reduce back to series
@@ -311,10 +316,11 @@ class SimpleShuffle(PartitionsFiltered, Shuffle):
         "npartitions_out",
         "ignore_index",
         "options",
+        "on",
         "_partitions",
     ]
 
-    _defaults = {"_partitions": None}
+    _defaults = {"_partitions": None, "on": None}
 
     @functools.cached_property
     def _meta(self):

@@ -190,7 +190,7 @@ class Expr:
         """
         raise NotImplementedError(
             "Expressions should define either _layer (full dictionary) or _task"
-            " (single task).  This expression type defines neither"
+            f" (single task).  This expression type {type(self)} defines neither"
         )
 
     def _layer(self) -> dict:

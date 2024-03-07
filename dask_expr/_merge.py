@@ -61,6 +61,7 @@ def previously_shuffled_on_same_column(expr, shuffle_column, npartitions):
 
         if (
             isinstance(node, RenameFrame)
+            and isinstance(node.operand("columns"), dict)
             and shuffle_column in node.operand("columns").values()
         ):
             map = {v: k for k, v in node.operand("columns").items()}
@@ -98,7 +99,7 @@ def previously_shuffled_on_same_column(expr, shuffle_column, npartitions):
             else:
                 shuffle_col = op.split_by
         elif isinstance(op, SimpleShuffle):
-            shuffle_col = op.partitioning_index[0]
+            shuffle_col = op.on[0]
         elif isinstance(op, Merge):
             shuffle_col = []
             if op.left_index:

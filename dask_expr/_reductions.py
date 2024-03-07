@@ -167,6 +167,22 @@ class ShuffleReduce(Expr):
             return 1
 
     def _lower(self):
+        from dask_expr._merge import previously_shuffled_on_same_column
+
+        shuffle_col = (
+            self.split_by if not isinstance(self.split_by, list) else self.split_by[0]
+        )
+        if previously_shuffled_on_same_column(
+            self.frame, shuffle_col, self.npartitions
+        ):
+            return Aggregate(
+                self.frame,
+                self.kind,
+                self.aggregate,
+                self.aggregate_kwargs,
+                *self.aggregate_args,
+            )
+
         from dask_expr._repartition import Repartition
         from dask_expr._shuffle import RearrangeByColumn, SetIndexBlockwise, SortValues
 
