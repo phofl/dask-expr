@@ -46,7 +46,7 @@ _HASH_COLUMN_NAME = "__hash_partition"
 _PARTITION_COLUMN = "_partitions"
 
 
-def previously_shuffled_on_same_column(expr, shuffle_column):
+def previously_shuffled_on_same_column(expr, shuffle_column, npartitions):
     seen = set()
     stack = [expr]
 
@@ -106,7 +106,7 @@ def previously_shuffled_on_same_column(expr, shuffle_column):
                     op.right_on[0] if isinstance(op.right_on, list) else op.right_on
                 )
 
-            if shuffle_column in shuffle_col:
+            if shuffle_column in shuffle_col and op.npartitions == npartitions:
                 continue
             return False
 
@@ -118,7 +118,7 @@ def previously_shuffled_on_same_column(expr, shuffle_column):
 
         if isinstance(shuffle_col, Expr):
             shuffle_col = shuffle_col._meta._name
-        if shuffle_col != shuffle_column:
+        if shuffle_col != shuffle_column or op.npartitions != npartitions:
             return False
     return True
 
@@ -400,10 +400,12 @@ class Merge(Expr):
         shuffle_method = self.shuffle_method
 
         left_already_shuffled = previously_shuffled_on_same_column(
-            left, left_on if not left_index else left.index._meta.name
+            left, left_on if not left_index else left.index._meta.name, self.npartitions
         )
         right_already_shuffled = previously_shuffled_on_same_column(
-            right, right_on if not right_index else right.index._meta.name
+            right,
+            right_on if not right_index else right.index._meta.name,
+            self.npartitions,
         )
 
         # TODO:
